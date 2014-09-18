@@ -1,6 +1,7 @@
 import boto
 import boto.ec2
 from time import sleep
+from subprocess import call
 
 # Declare Literals
 __MASTER__ = 'master'
@@ -9,6 +10,11 @@ __SLAVE2__ = 'slave2'
 __DELIM__ = '-'
 __IP__ = 'ip'
 __ID__ = 0
+__DNS_INDEX__ = 2
+__SLAVE__ = 'slave'
+__MAPRED__ = 'mapred'
+__YARN__ = 'yarn'
+__CORE__ = 'core'
 
 # Declare Constants - temp fix - make more generic later
 master_instance_id = 'i-33fefd6f'
@@ -90,15 +96,90 @@ def get_instance(instance_id, suppress=False, region_name=region_id):
 				print '\tInstance %s is %s' % (inst.id,inst.state)
 			return inst
 
+def save_config(file_type):
+	print 'in save config with param %s' % file_type
+	if file_type == __MASTER__:
+		# now setup the path vars for the master file config
+		template_file_name = "templates/masters.template"
+		out_file_name = "config-files/masters"
+	elif file_type == __SLAVE__:
+		# now setup the path vars for the master file config
+		template_file_name = "templates/slaves.template"
+		out_file_name = "config-files/slaves"
+	elif file_type == __MAPRED__:
+		# now setup the path vars for the master file config
+		template_file_name = "templates/mapred-site.xml.template"
+		out_file_name = "config-files/mapred-site.xml"
+	elif file_type == __YARN__:
+		# now setup the path vars for the master file config
+		template_file_name = "templates/yarn-site.xml.template"
+		out_file_name = "config-files/yarn-site.xml"
+	elif file_type == __CORE__:
+		# now setup the path vars for the master file config
+		template_file_name = "templates/core-site.xml.template"
+		out_file_name = "config-files/core-site.xml"
+		
+	# open template for reading
+	template_file = open(template_file_name, "r")
+	out_file = open(out_file_name, "w")
+	
+	lines = template_file.readlines()
+	l_no = 1
+	for line in lines:
+		print 'Line No: %s : Line is: %s' % (l_no,line)
+		
+		# now tokenize based on MASTER_DNS
+		tokens = line.split()
+		print tokens, len(tokens)
+		out_line = ''
+		first_token = True
+		for token in tokens:
+			if token.find('MASTER-DNS') != -1:
+				print 'found a match', metadata[__MASTER__][__DNS_INDEX__]
+				# now do a replace since the string may have occurred anywhere
+				token = token.replace('MASTER-DNS',metadata[__MASTER__][__DNS_INDEX__])
+				#token = metadata[__MASTER__][__DNS_INDEX__]
+			elif token.find('SLAVE1-DNS') != -1:
+				print 'found a match', metadata[__SLAVE1__][__DNS_INDEX__]
+				# now do a replace since the string may have occurred anywhere
+				token = token.replace('SLAVE1-DNS',metadata[__SLAVE1__][__DNS_INDEX__])
+			elif token.find('SLAVE2-DNS') != -1:
+				print 'found a match', metadata[__SLAVE2__][__DNS_INDEX__]
+				# now do a replace since the string may have occurred anywhere
+				token = token.replace('SLAVE2-DNS',metadata[__SLAVE2__][__DNS_INDEX__])
+			# now add to the output line , the token, altered or not
+			if first_token:
+				out_line = out_line + token
+				# reset first_token at end of iteration
+				first_token = False
+			else:
+				out_line = out_line + ' ' + token
+		print tokens, len(tokens)
+		print 'Output Line: ', out_line
+		out_file.write(out_line+'\n')
+		
+		l_no = l_no+1
+	#print lines
+	# close the file objects
+	template_file.close()
+	out_file.close()
+
+	print 'all done here'
 
 if __name__ == '__main__':
 	# Step 0: Setup the metadata
-	setup_metadata()
+	#setup_metadata()
 	# Step 1: Start all M/S instances
 	# Step 2: Get the Public IP+DNS of master, and slaves --- for efficiency part of same function
     	start_hadoop_instances()
     	print metadata
-	# Step 3: Update File 1 with required info
-	# Step 4: Update remaining files with info. needed
+	# Step 3: Update Config Files with required info
+	#save_config(__MASTER__)
+	#save_config(__SLAVE__)
+	#save_config(__MAPRED__)
+	#save_config(__YARN__)
+	#save_config(__CORE__)
 	# Step 5: Copy files into master and slaves
+	call(["ls", "-l", "-a"])
+
 	# Step 6: Start required hadoop processes in master
