@@ -18,12 +18,15 @@ region_id = 'us-west-1'
 
 # Declare Global vars
 metadata = {}
+"""
+the metadata dict contains a list of items in each entry (key/value)
+index 0 -> instance_id
+index 1 -> public ip address
+index 2 -> public dns address
+"""
 
 def setup_metadata():
 	# this is really about setting up the metadata dict
-	# the metadata dict contains a list of items in each entry (key/value)
-	# index 0 -> instance_id
-	# index 1 -> public ip address (to be added later)
 	# [Sure, there is a more efficient to use list generators but fine for now]
 	masterList = []
 	masterList.append(master_instance_id)
@@ -48,6 +51,9 @@ def start_hadoop_instances():
 			instance = get_instance(metadata[key][__ID__],True)
 		#print instance.ip_address
 		metadata[key].append(instance.ip_address)
+		#print instance.public_dns_name
+		metadata[key].append(instance.public_dns_name)
+		
 	#print 'all done'
 
 def start_instance(instance, inst_type = __MASTER__, region_name='us-west-1'):
@@ -89,7 +95,7 @@ if __name__ == '__main__':
 	# Step 0: Setup the metadata
 	setup_metadata()
 	# Step 1: Start all M/S instances
-	# Step 2: Get the Public IP of master, and slaves --- for efficiency part of same function
+	# Step 2: Get the Public IP+DNS of master, and slaves --- for efficiency part of same function
     	start_hadoop_instances()
     	print metadata
 	# Step 3: Update File 1 with required info
