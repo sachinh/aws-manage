@@ -2,6 +2,10 @@ import boto
 import boto.ec2
 from time import sleep
 from subprocess import call
+import glob
+from os import listdir
+from os.path import isfile, join
+import os
 
 # Declare Literals
 __MASTER__ = 'master'
@@ -10,6 +14,7 @@ __SLAVE2__ = 'slave2'
 __DELIM__ = '-'
 __IP__ = 'ip'
 __ID__ = 0
+__IP_INDEX__ = 1
 __DNS_INDEX__ = 2
 __SLAVE__ = 'slave'
 __MAPRED__ = 'mapred'
@@ -97,7 +102,7 @@ def get_instance(instance_id, suppress=False, region_name=region_id):
 			return inst
 
 def save_config(file_type):
-	print 'in save config with param %s' % file_type
+	#print 'in save config with param %s' % file_type
 	if file_type == __MASTER__:
 		# now setup the path vars for the master file config
 		template_file_name = "templates/masters.template"
@@ -126,25 +131,25 @@ def save_config(file_type):
 	lines = template_file.readlines()
 	l_no = 1
 	for line in lines:
-		print 'Line No: %s : Line is: %s' % (l_no,line)
+		#print 'Line No: %s : Line is: %s' % (l_no,line)
 		
 		# now tokenize based on MASTER_DNS
 		tokens = line.split()
-		print tokens, len(tokens)
+		#print tokens, len(tokens)
 		out_line = ''
 		first_token = True
 		for token in tokens:
 			if token.find('MASTER-DNS') != -1:
-				print 'found a match', metadata[__MASTER__][__DNS_INDEX__]
+				#print 'found a match', metadata[__MASTER__][__DNS_INDEX__]
 				# now do a replace since the string may have occurred anywhere
 				token = token.replace('MASTER-DNS',metadata[__MASTER__][__DNS_INDEX__])
 				#token = metadata[__MASTER__][__DNS_INDEX__]
 			elif token.find('SLAVE1-DNS') != -1:
-				print 'found a match', metadata[__SLAVE1__][__DNS_INDEX__]
+				#print 'found a match', metadata[__SLAVE1__][__DNS_INDEX__]
 				# now do a replace since the string may have occurred anywhere
 				token = token.replace('SLAVE1-DNS',metadata[__SLAVE1__][__DNS_INDEX__])
 			elif token.find('SLAVE2-DNS') != -1:
-				print 'found a match', metadata[__SLAVE2__][__DNS_INDEX__]
+				#print 'found a match', metadata[__SLAVE2__][__DNS_INDEX__]
 				# now do a replace since the string may have occurred anywhere
 				token = token.replace('SLAVE2-DNS',metadata[__SLAVE2__][__DNS_INDEX__])
 			# now add to the output line , the token, altered or not
@@ -154,8 +159,8 @@ def save_config(file_type):
 				first_token = False
 			else:
 				out_line = out_line + ' ' + token
-		print tokens, len(tokens)
-		print 'Output Line: ', out_line
+		#print tokens, len(tokens)
+		#print 'Output Line: ', out_line
 		out_file.write(out_line+'\n')
 		
 		l_no = l_no+1
@@ -164,22 +169,60 @@ def save_config(file_type):
 	template_file.close()
 	out_file.close()
 
-	print 'all done here'
+	#print 'all done here'
+
+def copy_config_files(node_type=__MASTER__):
+	#print 'in copy config files'
+	# setup the ip for node being connected to
+	#print metadata[node_type][__IP_INDEX__]
+	node_ip = metadata[node_type][__IP_INDEX__]
+	# find the listing of all the config files
+	config_file_dir = "/Users/sachinholla/Documents/Big Data/Engg/aws-manage/aws-manage/config-files"
+	#print glob.glob("/Users/sachinholla/Documents/Big Data/Engg/aws-manage/aws-manage/*")
+	config_files = [ join(config_file_dir,f) for f in listdir(config_file_dir) if isfile(join(config_file_dir,f)) ]
+	#print 'Config-Files listing: ', config_files
+	
+	scp_args = []
+	scp_args.append('scp')
+	scp_args.append('-i')
+	scp_args.append('../../keypairs/SachinHollaKeypair.pem')
+	for config_file in config_files:
+		#print config_file
+		# add the config_file to the scp_args list
+		scp_args.append(config_file)
+	#
+	#scp_args.append('temp/mapred-site.xml')
+	target_dir = 'ubuntu@' + node_ip + ':/home/ubuntu/hadoop-2.2.0/etc/hadoop'
+	#target_dir = 'ubuntu@' + node_ip + ':/home/ubuntu'
+	scp_args.append(target_dir)
+	#print 'scp_args: ', scp_args
+	# do a basic error checking of files available
+	if len(config_files) > 0:
+		print '\t=============================================================='
+		print '\tHadoop Config Files are being copied to the %s instance' % node_type
+		print '\t=============================================================='
+		call(scp_args)
+	else:
+		print 'No Config Files available'
 
 if __name__ == '__main__':
 	# Step 0: Setup the metadata
-	#setup_metadata()
+	setup_metadata()
 	# Step 1: Start all M/S instances
 	# Step 2: Get the Public IP+DNS of master, and slaves --- for efficiency part of same function
     	start_hadoop_instances()
-    	print metadata
+    	#print metadata
 	# Step 3: Update Config Files with required info
-	#save_config(__MASTER__)
-	#save_config(__SLAVE__)
-	#save_config(__MAPRED__)
-	#save_config(__YARN__)
-	#save_config(__CORE__)
+	save_config(__MASTER__)
+	save_config(__SLAVE__)
+	save_config(__MAPRED__)
+	save_config(__YARN__)
+	save_config(__CORE__)
 	# Step 5: Copy files into master and slaves
-	call(["ls", "-l", "-a"])
-
+	print '\tPause processing to allow ssh services to be running on remote nodes'
+	sleep(5)
+	print '\tResuming processing ...'
+	copy_config_files(__MASTER__)
+	copy_config_files(__SLAVE1__)
+	copy_config_files(__SLAVE2__)
 	# Step 6: Start required hadoop processes in master

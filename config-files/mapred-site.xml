@@ -6,6 +6,6 @@
 <configuration>
 <property>
 <name>mapreduce.jobtracker.address</name>
-<value>ec2-54-183-110-127.us-west-1.compute.amazonaws.com:54311</value>
+<value>ec2-54-183-198-227.us-west-1.compute.amazonaws.com:54311</value>
 </property>
 </configuration>
