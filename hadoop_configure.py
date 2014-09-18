@@ -6,6 +6,9 @@ import glob
 from os import listdir
 from os.path import isfile, join
 import os
+import subprocess
+import paramiko
+from time import gmtime, strftime
 
 # Declare Literals
 __MASTER__ = 'master'
@@ -205,6 +208,58 @@ def copy_config_files(node_type=__MASTER__):
 	else:
 		print 'No Config Files available'
 
+def subprocess_cmd(command):
+	process = subprocess.Popen(command,stdout=subprocess.PIPE, shell=True)
+	proc_stdout = process.communicate()[0].strip()
+	print proc_stdout
+
+def try_ssh():
+	ssh = paramiko.SSHClient()
+	ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+	ssh.connect('54.183.233.202', username='ubuntu', password='', key_filename='/Users/sachinholla/Documents/Big Data/Engg/keypairs/SachinHollaKeypair.pem')
+	stdin, stdout, stderr = ssh.exec_command('pwd;ls -l')
+	print stdout.readlines()
+	ssh.close()
+    
+def start_hadoop_process():
+	print 'in the start hadoop process fn'
+	print '\t=============================================================='
+	print '\t\t\tFirst, start the HDFS on master'
+	print '\t=============================================================='
+	# first, start HDFS on master
+	hdp_job = []
+	hdp_job.append('ssh')
+	hdp_job.append('-i')
+	hdp_job.append('../../keypairs/SachinHollaKeypair.pem')
+	node_ip = metadata[__MASTER__][__IP_INDEX__]
+	target = 'ubuntu@' + node_ip
+	hdp_job.append(target)
+	
+	#print hdp_job
+	
+	#hdp_job.append('start-dfs.sh')
+	call(hdp_job)
+	
+	#sleep(1)
+	#hdp_job = []
+	#hdp_job.append('exit')
+	#call(hdp_job)
+	
+	#print '\t=============================================================='
+	#print '\t\t\tNext, start the YARN RM on master'
+	#print '\t=============================================================='
+	#hdp_job[0] = 'start-yarn.sh'
+	#call(hdp_job)
+	#print '\t=============================================================='
+	#print '\t\t\tFinally, use jps to validate processes started'
+	#print '\t=============================================================='
+	#hdp_job[0] = 'jps'
+	#call(hdp_job)
+	
+	print '\t=============================================================='
+	print '\t\t\tFinished with the remote execution'
+	print '\t=============================================================='
+
 if __name__ == '__main__':
 	# Step 0: Setup the metadata
 	setup_metadata()
@@ -226,3 +281,16 @@ if __name__ == '__main__':
 	copy_config_files(__SLAVE1__)
 	copy_config_files(__SLAVE2__)
 	# Step 6: Start required hadoop processes in master
+	print 'Starting a shell in AWS with unauthenticated slaves is not trivial'
+	print 'Hence, just the commands will be provided'
+	print 'Step 1: Start terminal to access the master instance: (This will be done below)\n\tssh -i ../../keypairs/SachinHollaKeypair.pem ubuntu@%s' % metadata[__MASTER__][__IP_INDEX__]
+	print 'Step 2: In that terminal, start HDFS: \n\tstart-dfs.sh'
+	print 'Step 3: And then, Startup YARN: \n\tstart-yarn.sh'
+	print 'Step 4: Validate by running: \n\tjps'
+	print 'Step 5: Test HDFS by running: \n\thadoop fs -ls'
+	print 'Step 6: Test sample wc M-R job by running: \n\thadoop jar $HADOOP_HOME/share/hadoop/mapreduce/hadoop*examples*.jar wordcount gutenberg gutenberg-output.%s' %(strftime("%Y-%m-%d-%H-%M-%S", gmtime()))
+	
+	start_hadoop_process()
+	#subprocess_cmd('echo a; echo b')
+	#subprocess_cmd('ssh -i ../../keypairs/SachinHollaKeypair.pem ubuntu@54.183.233.202; ls -l')
+	#try_ssh()
